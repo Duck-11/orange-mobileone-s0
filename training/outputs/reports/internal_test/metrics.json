@@ -1,0 +1,33 @@
+{
+  "threshold": 0.13999999999999999,
+  "total_images": 2250,
+  "accuracy": 0.9991111111111111,
+  "precision_good": 1.0,
+  "recall_good": 0.9955555555555555,
+  "f1_good": 0.9977728285077951,
+  "support_good": 450,
+  "precision_bad": 0.9988901220865705,
+  "recall_bad": 1.0,
+  "f1_bad": 0.9994447529150472,
+  "support_bad": 1800,
+  "macro_f1": 0.9986087907114212,
+  "weighted_f1": 0.9991103680335968,
+  "roc_auc": 1.0,
+  "true_good_predicted_good": 448,
+  "good_predicted_bad": 2,
+  "bad_predicted_good": 0,
+  "true_bad_predicted_bad": 1800,
+  "confusion_matrix": [
+    [
+      448,
+      2
+    ],
+    [
+      0,
+      1800
+    ]
+  ],
+  "dataset": "internal_test",
+  "model": "MobileNetV3Small",
+  "average_inference_ms_per_image": 3.2904605333589845
+}

@@ -1,0 +1,6 @@
+﻿original_class,binary_label,total_images,correct_images,average_probability_bad,accuracy
+blackspotted_orange,BAD,450,450,0.9993581963909997,1.0
+cankered_orange,BAD,450,450,0.9959676521354252,1.0
+fresh_orange,GOOD,450,448,0.0019583429992495937,0.9955555555555555
+green_orange,BAD,450,450,0.9999968061182234,1.0
+rotten_orange,BAD,450,450,0.9955175116327074,1.0

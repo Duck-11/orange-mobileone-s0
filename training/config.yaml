@@ -1,0 +1,48 @@
+project:
+  seed: 42
+  output_dir: "outputs"
+
+# Dataset gốc dùng để train MobileNetV3Small.
+# Thư mục này phải chứa 5 thư mục lớp ở bên dưới.
+data:
+  source_dir: "E:/dataset"
+  image_size: 224
+  train_ratio: 0.70
+  validation_ratio: 0.15
+  test_ratio: 0.15
+  allowed_extensions: [".jpg", ".jpeg", ".png"]
+  validate_images: true
+  class_mapping:
+    fresh_orange: GOOD
+    blackspotted_orange: BAD
+    cankered_orange: BAD
+    rotten_orange: BAD
+    green_orange: BAD
+
+training:
+  batch_size: 16
+  head_epochs: 12
+  fine_tune_epochs: 18
+  head_learning_rate: 0.001
+  fine_tune_learning_rate: 0.00001
+  fine_tune_last_layers: 30
+  dropout: 0.20
+  early_stopping_patience: 5
+  reduce_lr_patience: 2
+  cache_dataset: false
+
+threshold:
+  min: 0.10
+  max: 0.90
+  step: 0.01
+
+# Có thể thêm nhiều dataset test ngoài. Một lệnh evaluate-all sẽ chạy tất cả.
+# path có thể trỏ thẳng tới thư mục test hoặc thư mục cha chứa train/test.
+external_datasets:
+  - name: "orange_disease_external"
+    path: "E:/orange_new_dataset/test"
+    class_mapping:
+      fresh: GOOD
+      blackspot: BAD
+      canker: BAD
+      grenning: BAD

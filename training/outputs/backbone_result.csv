@@ -1,0 +1,2 @@
+﻿backbone,dataset,accuracy,precision_bad,recall_bad,f1_bad,macro_f1,weighted_f1,roc_auc,good_predicted_bad,bad_predicted_good,threshold,parameter_count,keras_model_size_mb,average_inference_ms_per_image
+MobileNetV3Small,internal_test,0.9991111111111111,0.9988901220865705,1.0,0.9994447529150472,0.9986087907114212,0.9991103680335968,1.0,2,0,0.13999999999999999,939697,8.597529411315918,3.2904605333589845

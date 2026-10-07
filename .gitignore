@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+.venv-app/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# PyTorch / model
+*.pth
+*.pt
+*.onnx
+
+# Dataset
+data/
+dataset/
+datasets/
+
+# TensorBoard
+runs/
+logs/
+
+# Cache
+.pytest_cache/
+.mypy_cache/
+
+# Environment
+.env
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,16 @@
+# Thư viện tối giản để CHẠY app.py (không cần để train).
+# Trên Windows / máy phát triển: dùng tensorflow đầy đủ (đã bao gồm tf.lite).
+opencv-python==4.10.0.84
+numpy==1.26.4
+tensorflow==2.16.1
+
+# ------------------------------------------------------------------
+# Trên Raspberry Pi: KHÔNG cài tensorflow đầy đủ (rất nặng, rất chậm).
+# Chỉ cần cài các gói sau (xem README.md phần "Raspberry Pi"):
+#
+#   pip install opencv-python-headless numpy
+#   pip install tflite-runtime
+#
+# app.py tự ưu tiên dùng tflite_runtime nếu có, nếu không sẽ fallback
+# sang tensorflow.lite (khi tensorflow đầy đủ được cài).
+# ------------------------------------------------------------------
