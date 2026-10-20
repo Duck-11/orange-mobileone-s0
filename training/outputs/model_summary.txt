@@ -1,18 +1,1019 @@
-Model: "orange_mobilenetv3_small"
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
-┃ Layer (type)                         ┃ Output Shape                ┃         Param # ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
-│ image (InputLayer)                   │ (None, 224, 224, 3)         │               0 │
-├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
-│ MobileNetV3Small (Functional)        │ (None, 7, 7, 576)           │         939,120 │
-├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
-│ global_average_pooling               │ (None, 576)                 │               0 │
-│ (GlobalAveragePooling2D)             │                             │                 │
-├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
-│ dropout (Dropout)                    │ (None, 576)                 │               0 │
-├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
-│ probability_bad (Dense)              │ (None, 1)                   │             577 │
-└──────────────────────────────────────┴─────────────────────────────┴─────────────────┘
- Total params: 939,697 (3.58 MB)
- Trainable params: 577 (2.25 KB)
- Non-trainable params: 939,120 (3.58 MB)
+OrangeMobileOneS0(
+  (backbone): ByobNet(
+    (stem): MobileOneBlock(
+      (conv_kxk): ModuleList(
+        (0): ConvNormAct(
+          (conv): Conv2d(3, 48, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+          (bn): BatchNormAct2d(
+            48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+        )
+      )
+      (conv_scale): ConvNormAct(
+        (conv): Conv2d(3, 48, kernel_size=(1, 1), stride=(2, 2), bias=False)
+        (bn): BatchNormAct2d(
+          48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+          (drop): Identity()
+          (act): Identity()
+        )
+      )
+      (drop_path): Identity()
+      (attn): Identity()
+      (act): ReLU(inplace=True)
+    )
+    (stages): Sequential(
+      (0): Sequential(
+        (0): MobileOneBlock(
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(48, 48, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), groups=48, bias=False)
+              (bn): BatchNormAct2d(
+                48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(48, 48, kernel_size=(1, 1), stride=(2, 2), groups=48, bias=False)
+            (bn): BatchNormAct2d(
+              48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (1): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(48, 48, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (2): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(48, 48, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=48, bias=False)
+              (bn): BatchNormAct2d(
+                48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(48, 48, kernel_size=(1, 1), stride=(1, 1), groups=48, bias=False)
+            (bn): BatchNormAct2d(
+              48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (3): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(48, 48, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+      )
+      (1): Sequential(
+        (0): MobileOneBlock(
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(48, 48, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), groups=48, bias=False)
+              (bn): BatchNormAct2d(
+                48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(48, 48, kernel_size=(1, 1), stride=(2, 2), groups=48, bias=False)
+            (bn): BatchNormAct2d(
+              48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (1): MobileOneBlock(
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(48, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (2): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=128, bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), groups=128, bias=False)
+            (bn): BatchNormAct2d(
+              128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (3): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (4): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=128, bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), groups=128, bias=False)
+            (bn): BatchNormAct2d(
+              128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (5): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (6): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=128, bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), groups=128, bias=False)
+            (bn): BatchNormAct2d(
+              128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (7): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (8): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=128, bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), groups=128, bias=False)
+            (bn): BatchNormAct2d(
+              128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (9): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (10): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=128, bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), groups=128, bias=False)
+            (bn): BatchNormAct2d(
+              128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (11): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (12): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=128, bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), groups=128, bias=False)
+            (bn): BatchNormAct2d(
+              128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (13): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (14): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=128, bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), groups=128, bias=False)
+            (bn): BatchNormAct2d(
+              128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (15): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+      )
+      (2): Sequential(
+        (0): MobileOneBlock(
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), groups=128, bias=False)
+              (bn): BatchNormAct2d(
+                128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(2, 2), groups=128, bias=False)
+            (bn): BatchNormAct2d(
+              128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (1): MobileOneBlock(
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(128, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (2): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=256, bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), groups=256, bias=False)
+            (bn): BatchNormAct2d(
+              256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (3): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (4): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=256, bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), groups=256, bias=False)
+            (bn): BatchNormAct2d(
+              256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (5): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (6): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=256, bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), groups=256, bias=False)
+            (bn): BatchNormAct2d(
+              256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (7): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (8): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=256, bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), groups=256, bias=False)
+            (bn): BatchNormAct2d(
+              256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (9): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (10): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=256, bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), groups=256, bias=False)
+            (bn): BatchNormAct2d(
+              256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (11): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (12): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=256, bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), groups=256, bias=False)
+            (bn): BatchNormAct2d(
+              256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (13): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (14): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=256, bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), groups=256, bias=False)
+            (bn): BatchNormAct2d(
+              256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (15): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (16): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=256, bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), groups=256, bias=False)
+            (bn): BatchNormAct2d(
+              256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (17): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (18): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=256, bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), groups=256, bias=False)
+            (bn): BatchNormAct2d(
+              256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (19): MobileOneBlock(
+          (identity): BatchNormAct2d(
+            256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+            (drop): Identity()
+            (act): Identity()
+          )
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+      )
+      (3): Sequential(
+        (0): MobileOneBlock(
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 256, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), groups=256, bias=False)
+              (bn): BatchNormAct2d(
+                256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (conv_scale): ConvNormAct(
+            (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(2, 2), groups=256, bias=False)
+            (bn): BatchNormAct2d(
+              256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+              (drop): Identity()
+              (act): Identity()
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+        (1): MobileOneBlock(
+          (conv_kxk): ModuleList(
+            (0-3): 4 x ConvNormAct(
+              (conv): Conv2d(256, 1024, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNormAct2d(
+                1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                (drop): Identity()
+                (act): Identity()
+              )
+            )
+          )
+          (drop_path): Identity()
+          (attn): Identity()
+          (act): ReLU(inplace=True)
+        )
+      )
+    )
+    (final_conv): Identity()
+    (head): ClassifierHead(
+      (global_pool): SelectAdaptivePool2d(pool_type=avg, flatten=Flatten(start_dim=1, end_dim=-1))
+      (drop): Dropout(p=0.0, inplace=False)
+      (fc): Identity()
+      (flatten): Identity()
+    )
+  )
+  (dropout): Dropout(p=0.2, inplace=False)
+  (head): Linear(in_features=1024, out_features=1, bias=True)
+)

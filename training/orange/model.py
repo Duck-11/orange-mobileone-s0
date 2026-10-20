@@ -1,211 +1,75 @@
-"""Xây dựng và huấn luyện trực tiếp MobileNetV3Small."""
+"""MobileOne-S0 thật, lấy từ package `timm` (port của apple/ml-mobileone).
+Thay thế hoàn toàn MobileNetV3Small cũ.
 
+Quy ước I/O (giống tinh thần `include_preprocessing=True` cũ):
+  - Input : ảnh RGB, float32, NCHW, giá trị 0..255 (chưa chia 255).
+  - Chuẩn hoá mean/std lấy ĐÚNG từ pretrained_cfg của weights timm, nằm TRONG model.
+  - Output: logit BAD (p_BAD = sigmoid). Nhãn GOOD=0, BAD=1.
+"""
 from __future__ import annotations
+import copy
+import torch
+import torch.nn as nn
 
-import csv
-import logging
-from pathlib import Path
-from typing import Any
-
-import numpy as np
-
-LOGGER = logging.getLogger(__name__)
+TIMM_NAME = "mobileone_s0.apple_in1k"   # variant S0 + weights ImageNet của Apple (qua timm)
+IMAGE_SIZE = 224
+LABELS = {"GOOD": 0, "BAD": 1}
 
 
-def build_mobilenetv3_small(image_size: int, dropout: float):
-    """Tạo model nhị phân GOOD/BAD từ MobileNetV3Small pretrained ImageNet."""
-    import tensorflow as tf
+class OrangeMobileOneS0(nn.Module):
+    def __init__(self, pretrained: bool = True, dropout: float = 0.2, timm_name: str = TIMM_NAME):
+        super().__init__()
+        import timm
+        self.timm_name = timm_name
+        self.backbone = timm.create_model(timm_name, pretrained=pretrained, num_classes=0)
+        cfg = self.backbone.pretrained_cfg
+        self.norm_cfg = {"mean": list(cfg["mean"]), "std": list(cfg["std"]),
+                         "input_size": list(cfg["input_size"])}
+        mean = torch.tensor(cfg["mean"]).view(1, 3, 1, 1) * 255.0
+        std = torch.tensor(cfg["std"]).view(1, 3, 1, 1) * 255.0
+        self.register_buffer("pix_mean", mean, persistent=False)
+        self.register_buffer("pix_std", std, persistent=False)
+        self.dropout = nn.Dropout(dropout)
+        self.head = nn.Linear(self.backbone.num_features, 1)
 
-    inputs = tf.keras.Input(shape=(image_size, image_size, 3), name="image")
-    backbone = tf.keras.applications.MobileNetV3Small(
-        input_shape=(image_size, image_size, 3),
-        include_top=False,
-        weights="imagenet",
-        include_preprocessing=True,
-    )
-    backbone.trainable = False
+    def forward(self, x_0_255: torch.Tensor) -> torch.Tensor:
+        x = (x_0_255 - self.pix_mean) / self.pix_std
+        return self.head(self.dropout(self.backbone(x))).squeeze(1)
 
-    # training=False giữ BatchNormalization ở chế độ inference khi fine-tune.
-    x = backbone(inputs, training=False)
-    x = tf.keras.layers.GlobalAveragePooling2D(name="global_average_pooling")(x)
-    x = tf.keras.layers.Dropout(dropout, name="dropout")(x)
-    outputs = tf.keras.layers.Dense(1, activation="sigmoid", name="probability_bad")(x)
-
-    model = tf.keras.Model(inputs, outputs, name="orange_mobilenetv3_small")
-    return model, backbone
-
-
-def compile_model(model, learning_rate: float) -> None:
-    """Compile model với các metric cần thiết trong lúc train."""
-    import tensorflow as tf
-
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-        loss=tf.keras.losses.BinaryCrossentropy(),
-        metrics=[
-            tf.keras.metrics.BinaryAccuracy(name="accuracy"),
-            tf.keras.metrics.Precision(name="precision_bad"),
-            tf.keras.metrics.Recall(name="recall_bad"),
-            tf.keras.metrics.AUC(name="auc"),
-        ],
-    )
+    def p_bad(self, x_0_255: torch.Tensor) -> torch.Tensor:
+        return torch.sigmoid(self.forward(x_0_255))
 
 
-def enable_fine_tuning(backbone, last_layers: int) -> None:
-    """Mở các tầng cuối để fine-tune, giữ BatchNormalization đóng băng."""
-    import tensorflow as tf
-
-    if last_layers <= 0:
-        raise ValueError("fine_tune_last_layers phải lớn hơn 0.")
-
-    backbone.trainable = True
-    cutoff = max(0, len(backbone.layers) - last_layers)
-    for index, layer in enumerate(backbone.layers):
-        layer.trainable = index >= cutoff and not isinstance(
-            layer, tf.keras.layers.BatchNormalization
-        )
-
-    trainable_count = sum(layer.trainable for layer in backbone.layers)
-    LOGGER.info(
-        "Fine-tune %d/%d layer của MobileNetV3Small.",
-        trainable_count,
-        len(backbone.layers),
-    )
+class DeployPBad(nn.Module):
+    """Bọc để ONNX xuất thẳng p_BAD (sigmoid nằm trong graph)."""
+    def __init__(self, m: OrangeMobileOneS0):
+        super().__init__(); self.m = m
+    def forward(self, x):
+        return self.m.p_bad(x).unsqueeze(1)
 
 
-def _callbacks(
-    model_path: Path,
-    log_path: Path,
-    patience: int,
-    reduce_lr_patience: int,
-    append_log: bool,
-    shared_checkpoint=None,
-):
-    """Tạo callback ngắn gọn, checkpoint theo validation AUC."""
-    import tensorflow as tf
-
-    checkpoint = shared_checkpoint or tf.keras.callbacks.ModelCheckpoint(
-        filepath=model_path,
-        monitor="val_auc",
-        mode="max",
-        save_best_only=True,
-        verbose=1,
-    )
-    callbacks = [
-        checkpoint,
-        tf.keras.callbacks.EarlyStopping(
-            monitor="val_auc",
-            mode="max",
-            patience=patience,
-            restore_best_weights=False,
-            verbose=1,
-        ),
-        tf.keras.callbacks.ReduceLROnPlateau(
-            monitor="val_auc",
-            mode="max",
-            factor=0.3,
-            patience=reduce_lr_patience,
-            min_lr=1e-7,
-            verbose=1,
-        ),
-        tf.keras.callbacks.CSVLogger(log_path, append=append_log),
-    ]
-    return callbacks, checkpoint
+def reparameterize(model: OrangeMobileOneS0) -> OrangeMobileOneS0:
+    """Bản deploy (đã gộp nhánh). Trả BẢN SAO, model train giữ nguyên."""
+    from timm.utils import reparameterize_model
+    return reparameterize_model(copy.deepcopy(model).eval(), inplace=True)
 
 
-def train_two_stage(
-    model,
-    backbone,
-    train_dataset,
-    validation_dataset,
-    class_weight: dict[int, float],
-    training_config: dict[str, Any],
-    output_dir: Path,
-):
-    """Train classifier head rồi fine-tune các tầng cuối."""
-    model_dir = output_dir / "models"
-    log_dir = output_dir / "logs"
-    model_dir.mkdir(parents=True, exist_ok=True)
-    log_dir.mkdir(parents=True, exist_ok=True)
-
-    best_model_path = model_dir / "best_model.keras"
-    training_log_path = log_dir / "training_log.csv"
-
-    compile_model(model, float(training_config["head_learning_rate"]))
-    head_callbacks, checkpoint = _callbacks(
-        model_path=best_model_path,
-        log_path=training_log_path,
-        patience=int(training_config["early_stopping_patience"]),
-        reduce_lr_patience=int(training_config["reduce_lr_patience"]),
-        append_log=False,
-    )
-
-    LOGGER.info("Bắt đầu giai đoạn 1: train classifier head.")
-    head_history = model.fit(
-        train_dataset,
-        validation_data=validation_dataset,
-        epochs=int(training_config["head_epochs"]),
-        class_weight=class_weight,
-        callbacks=head_callbacks,
-        verbose=1,
-    )
-
-    enable_fine_tuning(backbone, int(training_config["fine_tune_last_layers"]))
-    compile_model(model, float(training_config["fine_tune_learning_rate"]))
-    fine_callbacks, _ = _callbacks(
-        model_path=best_model_path,
-        log_path=training_log_path,
-        patience=int(training_config["early_stopping_patience"]),
-        reduce_lr_patience=int(training_config["reduce_lr_patience"]),
-        append_log=True,
-        shared_checkpoint=checkpoint,
-    )
-
-    LOGGER.info("Bắt đầu giai đoạn 2: fine-tune MobileNetV3Small.")
-    fine_history = model.fit(
-        train_dataset,
-        validation_data=validation_dataset,
-        epochs=int(training_config["fine_tune_epochs"]),
-        class_weight=class_weight,
-        callbacks=fine_callbacks,
-        verbose=1,
-    )
-
-    if not best_model_path.exists():
-        raise RuntimeError("Không tạo được best_model.keras sau khi train.")
-
-    final_model_path = model_dir / "final_model.keras"
-    model.save(final_model_path)
-
-    combined_history = combine_histories(head_history.history, fine_history.history)
-    combined_history["fine_tune_start_epoch"] = len(
-        next(iter(head_history.history.values()), [])
-    )
-    return best_model_path, final_model_path, combined_history
+def freeze_batchnorm(model: nn.Module) -> None:
+    """Dùng cho phase 1 (BN frozen). Gọi lại SAU mỗi lần model.train()."""
+    for m in model.modules():
+        if isinstance(m, nn.modules.batchnorm._BatchNorm):
+            m.eval()
+            for p in m.parameters():
+                p.requires_grad = False
 
 
-def combine_histories(
-    head_history: dict[str, list[float]],
-    fine_history: dict[str, list[float]],
-) -> dict[str, Any]:
-    """Ghép lịch sử hai giai đoạn theo cùng tên metric."""
-    keys = sorted(set(head_history) | set(fine_history))
-    combined: dict[str, Any] = {}
-    for key in keys:
-        combined[key] = list(head_history.get(key, [])) + list(fine_history.get(key, []))
-    return combined
+def save_checkpoint(model: OrangeMobileOneS0, path, extra: dict | None = None) -> None:
+    torch.save({"state_dict": model.state_dict(), "timm_name": model.timm_name,
+                "norm_cfg": model.norm_cfg, "labels": LABELS, "extra": extra or {}}, path)
 
 
-def save_model_summary(model, path: Path) -> None:
-    """Lưu kiến trúc model dạng text."""
-    lines: list[str] = []
-    model.summary(print_fn=lines.append)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines), encoding="utf-8")
-
-
-def load_keras_model(path: Path):
-    """Nạp model Keras không có custom layer/metric."""
-    import tensorflow as tf
-
-    return tf.keras.models.load_model(path, compile=False)
+def load_checkpoint(path, dropout: float = 0.2) -> OrangeMobileOneS0:
+    ck = torch.load(path, map_location="cpu",weights_only=True)
+    m = OrangeMobileOneS0(pretrained=False, dropout=dropout, timm_name=ck["timm_name"])
+    m.load_state_dict(ck["state_dict"])
+    return m.eval()

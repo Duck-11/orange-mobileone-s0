@@ -1,26 +1,26 @@
 {
-  "threshold": 0.13999999999999999,
+  "threshold": 0.1,
   "total_images": 2250,
-  "accuracy": 0.9991111111111111,
+  "accuracy": 1.0,
   "precision_good": 1.0,
-  "recall_good": 0.9955555555555555,
-  "f1_good": 0.9977728285077951,
+  "recall_good": 1.0,
+  "f1_good": 1.0,
   "support_good": 450,
-  "precision_bad": 0.9988901220865705,
+  "precision_bad": 1.0,
   "recall_bad": 1.0,
-  "f1_bad": 0.9994447529150472,
+  "f1_bad": 1.0,
   "support_bad": 1800,
-  "macro_f1": 0.9986087907114212,
-  "weighted_f1": 0.9991103680335968,
+  "macro_f1": 1.0,
+  "weighted_f1": 1.0,
   "roc_auc": 1.0,
-  "true_good_predicted_good": 448,
-  "good_predicted_bad": 2,
+  "true_good_predicted_good": 450,
+  "good_predicted_bad": 0,
   "bad_predicted_good": 0,
   "true_bad_predicted_bad": 1800,
   "confusion_matrix": [
     [
-      448,
-      2
+      450,
+      0
     ],
     [
       0,
@@ -28,6 +28,6 @@
     ]
   ],
   "dataset": "internal_test",
-  "model": "MobileNetV3Small",
-  "average_inference_ms_per_image": 3.2904605333589845
+  "model": "MobileOne-S0",
+  "average_inference_ms_per_image": 24.055381511110884
 }

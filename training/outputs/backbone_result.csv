@@ -1,2 +1,3 @@
-﻿backbone,dataset,accuracy,precision_bad,recall_bad,f1_bad,macro_f1,weighted_f1,roc_auc,good_predicted_bad,bad_predicted_good,threshold,parameter_count,keras_model_size_mb,average_inference_ms_per_image
-MobileNetV3Small,internal_test,0.9991111111111111,0.9988901220865705,1.0,0.9994447529150472,0.9986087907114212,0.9991103680335968,1.0,2,0,0.13999999999999999,939697,8.597529411315918,3.2904605333589845
+﻿backbone,dataset,accuracy,precision_bad,recall_bad,f1_bad,macro_f1,weighted_f1,roc_auc,good_predicted_bad,bad_predicted_good,threshold,parameter_count,checkpoint_size_mb,average_inference_ms_per_image
+MobileOne-S0,internal_test,1.0,1.0,1.0,1.0,1.0,1.0,1.0,0,0,0.1,4269297,17.113994598388672,24.055381511110884
+MobileOne-S0,orange_disease_external,0.9162168505045764,0.9124943617501128,0.9254345837145471,0.918918918918919,0.9161236983523946,0.9161965144713535,0.9721942481729297,194,163,0.5,4269297,17.113994598388672,21.871514550574624

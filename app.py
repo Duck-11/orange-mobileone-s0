@@ -18,14 +18,14 @@ LABEL_GOOD = "GOOD"
 LABEL_BAD = "BAD"
 DEFAULT_THRESHOLD = 0.5
 
-MODEL_TFLITE_PATH = APP_DIR / "model.tflite"
-MODEL_KERAS_PATH = APP_DIR / "model.keras"
+MODEL_ONNX_PATH = APP_DIR / "model.onnx"
+MODEL_META_PATH = APP_DIR / "model_meta.json"
 THRESHOLD_JSON_PATH = APP_DIR / "threshold.json"
 
 # Cấu hình detector.
 #
 # Detector không phải model AI object detection. Nó dùng HSV + contour để
-# tìm vùng có hình dạng giống quả cam trước khi đưa crop vào MobileNet.
+# tìm vùng có hình dạng giống quả cam trước khi đưa crop vào MobileOne-S0.
 
 # HSV rộng để nhận cam vàng, cam, cam xanh và cam bị bệnh.
 HSV_LOWER = np.array([0, 75, 45], dtype=np.uint8)
@@ -74,105 +74,38 @@ def load_threshold() -> float:
 
 # MODEL
 class OrangeClassifier:
-    """Load MobileNetV3-Small và dự đoán xác suất BAD."""
+    """Load MobileOne-S0 (ONNX, FP32, đã reparameterize) và dự đoán xác suất BAD.
+    Input ONNX: RGB NCHW float32 0..255; mean/std nằm trong graph (xem model_meta.json)."""
 
     def __init__(self) -> None:
-        self.backend = ""
+        import onnxruntime as ort
+        if not MODEL_ONNX_PATH.exists():
+            raise FileNotFoundError(
+                "Không tìm thấy model.onnx.\n"
+                f"Chạy convert_to_onnx.py để tạo tại: {APP_DIR}")
+        self.session = ort.InferenceSession(
+            str(MODEL_ONNX_PATH), providers=["CPUExecutionProvider"])
+        self.input_name = self.session.get_inputs()[0].name
+        self.backend = "onnxruntime"
+        meta = {}
+        if MODEL_META_PATH.exists():
+            meta = json.loads(MODEL_META_PATH.read_text(encoding="utf-8"))
+        self.model_id = meta.get("model_id", "UNKNOWN")
+        print(f"[Model] {self.model_id} | dtype={meta.get('dtype', '?')} | "
+              f"backend={self.backend}")
 
-        if MODEL_TFLITE_PATH.exists():
-            self._load_tflite(MODEL_TFLITE_PATH)
-            self.backend = "tflite"
-
-        elif MODEL_KERAS_PATH.exists():
-            self._load_keras(MODEL_KERAS_PATH)
-            self.backend = "keras"
-
-        else:
-            raise FileNotFoundError("Không tìm thấy model.\n"
-                f"Đặt model.tflite hoặc model.keras tại: {APP_DIR}")
-
-        print(f"[Model] Đã load model bằng backend: {self.backend}")
-
-    def _load_tflite(self, path: Path) -> None:
-        """Load TensorFlow Lite."""
-
-        try:
-            import tflite_runtime.interpreter as tflite
-            interpreter_factory = tflite.Interpreter
-        except ImportError:
-            import tensorflow as tf
-            interpreter_factory = tf.lite.Interpreter
-        self.interpreter = interpreter_factory(model_path=str(path))
-        self.interpreter.allocate_tensors()
-
-        self.input_details = self.interpreter.get_input_details()
-        self.output_details = self.interpreter.get_output_details()
-
-        input_shape = self.input_details[0]["shape"]
-
-        if tuple(input_shape) != (1, IMAGE_SIZE, IMAGE_SIZE, 3):
-            print(f"[Cảnh báo] Input model là {input_shape}, "
-                f"không phải [1, {IMAGE_SIZE}, {IMAGE_SIZE}, 3].")
-
-    def _load_keras(self, path: Path) -> None:
-        """Load model Keras."""
-        import tensorflow as tf
-        self.keras_model = tf.keras.models.load_model(path, compile=False,)
-
-    def _predict_tflite(self, batch: np.ndarray) -> np.ndarray:
-        """Dự đoán bằng TFLite."""
-        results = []
-
-        input_info = self.input_details[0]
-        output_info = self.output_details[0]
-        input_dtype = input_info["dtype"]
-        for i in range(batch.shape[0]):
-            sample = batch[i: i + 1]
-            if input_dtype == np.float32:
-                input_tensor = sample.astype(np.float32)
-            else:
-                scale, zero_point = input_info["quantization"]
-                if scale == 0:
-                    input_tensor = sample.astype(input_dtype)
-                else:
-                    input_tensor = (sample / scale + zero_point).astype(input_dtype)
-            self.interpreter.set_tensor(input_info["index"], input_tensor,)
-            self.interpreter.invoke()
-            output = self.interpreter.get_tensor(output_info["index"])
-            if output_info["dtype"] != np.float32:
-                scale, zero_point = output_info["quantization"]
-                if scale != 0:
-                    output = (output.astype(np.float32) - zero_point) * scale
-            results.append(float(output.reshape(-1)[0]))
-
-        return np.array(results, dtype=np.float32,)
-
-    def _predict_keras(self, batch: np.ndarray) -> np.ndarray:
-        """Dự đoán bằng Keras."""
-        output = self.keras_model.predict(batch, verbose=0,)
-        return output.reshape(-1).astype(np.float32)
-
-    def predict_probability_bad( self, crops_bgr: list[np.ndarray],
-    ) -> np.ndarray:
+    def predict_probability_bad(self, crops_bgr: list[np.ndarray]) -> np.ndarray:
         """Nhận crop BGR và trả về xác suất BAD."""
         if not crops_bgr:
-            return np.array([],dtype=np.float32,)
-
-        batch = np.zeros((len(crops_bgr),IMAGE_SIZE,IMAGE_SIZE,3,),dtype=np.float32,)
-
+            return np.array([], dtype=np.float32)
+        batch = np.zeros((len(crops_bgr), 3, IMAGE_SIZE, IMAGE_SIZE), dtype=np.float32)
         for i, crop in enumerate(crops_bgr):
-            resized = cv2.resize(crop,(IMAGE_SIZE, IMAGE_SIZE),interpolation=cv2.INTER_AREA,)
-
-            rgb = cv2.cvtColor(resized,cv2.COLOR_BGR2RGB, )
-
-            # MobileNetV3Small được train với include_preprocessing=True.
-            # Vì vậy KHÔNG chia ảnh cho 255 ở đây.
-            batch[i] = rgb.astype(np.float32)
-
-        if self.backend == "tflite":
-            return np.clip(self._predict_tflite(batch),0.0,1.0,)
-
-        return np.clip(self._predict_keras(batch),0.0,1.0,)
+            resized = cv2.resize(crop, (IMAGE_SIZE, IMAGE_SIZE), interpolation=cv2.INTER_AREA)
+            rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
+            # KHÔNG chia 255 / không chuẩn hoá ở đây: mean/std nằm trong model.
+            batch[i] = rgb.astype(np.float32).transpose(2, 0, 1)
+        out = self.session.run(None, {self.input_name: batch})[0].reshape(-1)
+        return np.clip(out.astype(np.float32), 0.0, 1.0)
 
 # PHÁT HIỆN QUẢ CAM
 def detect_orange_boxes(frame_bgr: np.ndarray,
@@ -488,7 +421,7 @@ def run_image(
 # ARGUMENT PARSER
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=("Phân loại chất lượng quả cam " "GOOD/BAD bằng MobileNetV3-Small.")
+        description=("Phân loại chất lượng quả cam " "GOOD/BAD bằng MobileOne-S0.")
     )
     mode_group = parser.add_mutually_exclusive_group()
     mode_group.add_argument(

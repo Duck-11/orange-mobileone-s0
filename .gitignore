@@ -1,9 +1,11 @@
 # Python
 __pycache__/
+.pytest_cache/
 *.py[cod]
 *.pyo
 
 # Virtual environment
+training/.venv_new/
 .venv/
 .venv-app/
 venv/
@@ -37,3 +39,9 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# file lớn sinh ra khi train (tuỳ chọn: bỏ dòng nào bạn muốn commit)
+training/outputs/
+*.pt
+*.bak_remap
+*.bak_threshold

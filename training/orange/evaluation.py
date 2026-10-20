@@ -26,11 +26,19 @@ from sklearn.metrics import (
 LOGGER = logging.getLogger(__name__)
 
 
-def predict_frame(model, dataset, frame: pd.DataFrame) -> tuple[np.ndarray, float]:
-    """Dự đoán theo đúng thứ tự frame và trả thời gian trung bình mỗi ảnh."""
+def predict_frame(model, loader, frame: pd.DataFrame, device=None) -> tuple[np.ndarray, float]:
+    """Dự đoán p_BAD (FP32, PyTorch) theo đúng thứ tự frame; trả thời gian TB mỗi ảnh (ms)."""
+    import torch
+
+    model.eval()
+    device = device or next(model.parameters()).device
     start = time.perf_counter()
-    probabilities = model.predict(dataset, verbose=1).reshape(-1).astype(np.float64)
+    outputs = []
+    with torch.no_grad():
+        for images, _ in loader:
+            outputs.append(model.p_bad(images.to(device)).cpu().numpy())
     elapsed = time.perf_counter() - start
+    probabilities = np.concatenate(outputs).reshape(-1).astype(np.float64)
 
     if len(probabilities) != len(frame):
         raise RuntimeError(
@@ -236,7 +244,7 @@ def save_dataset_report(
     threshold: float,
     average_inference_ms: float,
     output_dir: Path,
-    model_name: str = "MobileNetV3Small",
+    model_name: str = "MobileOne-S0",
 ) -> dict[str, Any]:
     """Lưu báo cáo đầy đủ cho một dataset."""
     safe_name = "".join(char if char.isalnum() or char in "-_" else "_" for char in dataset_name)
@@ -319,7 +327,7 @@ def append_summary(
     for metrics in metrics_rows:
         rows.append(
             {
-                "backbone": metrics.get("model", "MobileNetV3Small"),
+                "backbone": metrics.get("model", "MobileOne-S0"),
                 "dataset": metrics["dataset"],
                 "accuracy": metrics["accuracy"],
                 "precision_bad": metrics["precision_bad"],
@@ -332,7 +340,7 @@ def append_summary(
                 "bad_predicted_good": metrics["bad_predicted_good"],
                 "threshold": metrics["threshold"],
                 "parameter_count": parameter_count,
-                "keras_model_size_mb": model_size_mb,
+                "checkpoint_size_mb": model_size_mb,
                 "average_inference_ms_per_image": metrics[
                     "average_inference_ms_per_image"
                 ],

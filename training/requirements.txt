@@ -1,8 +1,17 @@
-tensorflow==2.16.1
-numpy==1.26.4
-pandas==2.2.2
-scikit-learn==1.5.1
-matplotlib==3.9.1
-Pillow==10.4.0
-PyYAML==6.0.1
-tqdm==4.66.4
+# TRAIN / CONVERT MobileOne-S0 (PyTorch) — thay bản Keras cũ
+torch
+torchvision
+timm
+onnx
+onnxruntime
+huggingface_hub
+safetensors
+numpy
+pandas
+scikit-learn
+matplotlib
+pillow
+tqdm
+pyyaml
+pytest
+opencv-python

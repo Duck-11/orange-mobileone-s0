@@ -1,0 +1,33 @@
+{
+  "variant": "S0",
+  "timm_name": "mobileone_s0.apple_in1k",
+  "timm_version": "1.0.30",
+  "torch_version_at_proof_generation": "2.14.1+cpu",
+  "pretrained_cfg": {
+    "url": "",
+    "hf_hub_id": "timm/mobileone_s0.apple_in1k",
+    "architecture": "mobileone_s0",
+    "tag": "apple_in1k",
+    "custom_load": false,
+    "input_size": [3, 224, 224],
+    "fixed_input_size": false,
+    "interpolation": "bilinear",
+    "crop_pct": 0.875,
+    "crop_mode": "center",
+    "mean": [0.485, 0.456, 0.406],
+    "std": [0.229, 0.224, 0.225],
+    "num_classes": 1000,
+    "pool_size": [7, 7],
+    "first_conv": ["stem.conv_kxk.0.conv", "stem.conv_scale.conv"],
+    "classifier": "head.fc",
+    "license": "mobileone-license"
+  },
+  "backbone_parameter_count": 4268272,
+  "backbone_constructor": "timm.create_model('mobileone_s0.apple_in1k', num_classes=0)",
+  "license": "code apple/ml-mobileone: Apple Software License, https://github.com/apple/ml-mobileone/blob/main/LICENSE; timm/pytorch-image-models: Apache License 2.0 (the LICENSE file found); weights timm/mobileone_s0.apple_in1k: model card labels License: other and says to observe original license, https://huggingface.co/timm/mobileone_s0.apple_in1k; separate weights license: not independently verified",
+  "weights_source": "https://huggingface.co/timm/mobileone_s0.apple_in1k",
+  "weights_revision": "2f1da1a4433b0636bace873cab611c9ee90d40de",
+  "weights_file": "HF cache: models--timm--mobileone_s0.apple_in1k/snapshots/2f1da1a4433b0636bace873cab611c9ee90d40de/model.safetensors",
+  "weights_sha256": "b624d5ab2a210791dff05fd4ec734b3ad271a47c2b053db625c5a5783eacb8bf",
+  "preprocessing_note": "mean/std theo pretrained_cfg; resize toàn ảnh về 224x224 bằng cv2 INTER_AREA, không center-crop 0.875 và không dùng bilinear như pretrained_cfg; chưa đo ảnh hưởng."
+}

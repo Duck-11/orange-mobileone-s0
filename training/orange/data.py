@@ -1,4 +1,4 @@
-"""Chuẩn bị dữ liệu và tạo tf.data pipeline."""
+"""Chuẩn bị dữ liệu và tạo PyTorch DataLoader (GOOD=0, BAD=1)."""
 
 from __future__ import annotations
 
@@ -33,15 +33,18 @@ def normalize_label(value: Any) -> int:
 
 
 def set_global_seed(seed: int) -> None:
-    """Đặt seed cho Python, NumPy và TensorFlow."""
+    """Đặt seed cho Python, NumPy và PyTorch."""
     random.seed(seed)
     np.random.seed(seed)
     try:
-        import tensorflow as tf
+        import torch
 
-        tf.keras.utils.set_random_seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
     except ModuleNotFoundError:
-        LOGGER.warning("Chưa cài TensorFlow; chỉ đặt seed cho Python và NumPy.")
+        LOGGER.warning("Chưa cài PyTorch; chỉ đặt seed cho Python và NumPy.")
 
 
 def resolve_dataset_root(path: str | Path, class_mapping: dict[str, Any]) -> Path:
@@ -238,61 +241,103 @@ def calculate_class_weight(train_df: pd.DataFrame) -> dict[int, float]:
     }
 
 
-def build_tf_dataset(
+def read_rgb(path: str, image_size: int) -> np.ndarray:
+    """Đọc ảnh -> RGB uint8 HxWx3, resize INTER_AREA.
+
+    Dùng đúng cách resize/đổi màu của app.py (cv2.INTER_AREA, BGR->RGB) để train và
+    deploy cùng một tiền xử lý. np.fromfile giúp đọc được đường dẫn có dấu trên Windows.
+    """
+    import cv2
+
+    data = np.fromfile(path, dtype=np.uint8)
+    bgr = cv2.imdecode(data, cv2.IMREAD_COLOR)
+    if bgr is None:
+        raise OSError(f"Không đọc được ảnh: {path}")
+    bgr = cv2.resize(bgr, (image_size, image_size), interpolation=cv2.INTER_AREA)
+    return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+
+
+def augment(rgb: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """Augmentation tương đương bản Keras cũ: flip ngang, xoay ~±0.04*2π rad,
+    zoom ±10%, tịnh tiến ±5%, contrast ±10% (viền reflect)."""
+    import cv2
+
+    size = rgb.shape[0]
+    if rng.random() < 0.5:
+        rgb = rgb[:, ::-1]
+    angle = rng.uniform(-0.04, 0.04) * 360.0
+    scale = rng.uniform(0.9, 1.1)
+    tx, ty = rng.uniform(-0.05, 0.05, size=2) * size
+    matrix = cv2.getRotationMatrix2D((size / 2.0, size / 2.0), angle, scale)
+    matrix[:, 2] += (tx, ty)
+    out = cv2.warpAffine(
+        np.ascontiguousarray(rgb), matrix, (size, size),
+        flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101,
+    ).astype(np.float32)
+    factor = rng.uniform(0.9, 1.1)
+    mean = out.mean(axis=(0, 1), keepdims=True)
+    out = np.clip((out - mean) * factor + mean, 0.0, 255.0)
+    return out
+
+
+try:  # module-level để DataLoader worker trên Windows (spawn) pickle được
+    from torch.utils.data import Dataset as _TorchDataset
+except ModuleNotFoundError:  # cho phép import khi chưa cài torch
+    _TorchDataset = object
+
+
+class OrangeDataset(_TorchDataset):
+    """Dataset PyTorch: trả (tensor float32 CHW giá trị 0..255, nhãn float).
+    Mean/std KHÔNG chuẩn hoá ở đây — đã nằm trong model (orange.model)."""
+
+    def __init__(self, frame: pd.DataFrame, image_size: int, training: bool, seed: int):
+        self.paths = frame["image_path"].astype(str).tolist()
+        self.labels = frame["label"].astype(np.float32).to_numpy()
+        self.image_size, self.training, self.seed = image_size, training, seed
+        self.epoch = 0
+
+    def set_epoch(self, epoch: int) -> None:
+        self.epoch = int(epoch)
+
+    def __len__(self) -> int:
+        return len(self.paths)
+
+    def __getitem__(self, index: int):
+        import torch
+
+        rgb = read_rgb(self.paths[index], self.image_size)
+        if self.training:
+            rng = np.random.default_rng([self.seed, self.epoch, index])
+            array = augment(rgb, rng)
+        else:
+            array = rgb.astype(np.float32)
+        tensor = torch.from_numpy(np.ascontiguousarray(array.transpose(2, 0, 1)))
+        return tensor, torch.tensor(self.labels[index], dtype=torch.float32)
+
+
+def build_loader(
     frame: pd.DataFrame,
     image_size: int,
     batch_size: int,
     training: bool,
     seed: int,
-    cache_dataset: bool = False,
+    num_workers: int = 0,
 ):
-    """Tạo tf.data.Dataset đọc ảnh theo batch."""
-    import tensorflow as tf
+    """DataLoader. Eval: không shuffle -> thứ tự dự đoán khớp frame."""
+    import torch
+    from torch.utils.data import DataLoader
 
-    paths = frame["image_path"].astype(str).to_numpy()
-    labels = frame["label"].astype(np.float32).to_numpy()
-
-    dataset = tf.data.Dataset.from_tensor_slices((paths, labels))
-    options = tf.data.Options()
-    options.experimental_deterministic = not training
-    dataset = dataset.with_options(options)
-
-    def decode(path, label):
-        content = tf.io.read_file(path)
-        image = tf.io.decode_image(content, channels=3, expand_animations=False)
-        image.set_shape([None, None, 3])
-        image = tf.image.resize(image, [image_size, image_size], antialias=True)
-        image = tf.cast(image, tf.float32)
-        return image, tf.reshape(tf.cast(label, tf.float32), [1])
-
-    dataset = dataset.map(decode, num_parallel_calls=tf.data.AUTOTUNE)
-
-    if cache_dataset:
-        dataset = dataset.cache()
-
-    if training:
-        dataset = dataset.shuffle(
-            buffer_size=min(len(frame), 4096), seed=seed, reshuffle_each_iteration=True
-        )
-
-    dataset = dataset.batch(batch_size)
-
-    if training:
-        augmentation = tf.keras.Sequential(
-            [
-                tf.keras.layers.RandomFlip("horizontal", seed=seed),
-                tf.keras.layers.RandomRotation(0.04, fill_mode="reflect", seed=seed + 1),
-                tf.keras.layers.RandomZoom(0.10, fill_mode="reflect", seed=seed + 2),
-                tf.keras.layers.RandomTranslation(
-                    0.05, 0.05, fill_mode="reflect", seed=seed + 3
-                ),
-                tf.keras.layers.RandomContrast(0.10, seed=seed + 4),
-            ],
-            name="train_augmentation",
-        )
-        dataset = dataset.map(
-            lambda images, labels: (augmentation(images, training=True), labels),
-            num_parallel_calls=tf.data.AUTOTUNE,
-        )
-
-    return dataset.prefetch(tf.data.AUTOTUNE)
+    dataset = OrangeDataset(frame, image_size, training, seed)
+    generator = torch.Generator()
+    generator.manual_seed(seed)
+    loader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=training,
+        generator=generator if training else None,
+        num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(),
+        drop_last=False,
+    )
+    loader.orange_dataset = dataset
+    return loader

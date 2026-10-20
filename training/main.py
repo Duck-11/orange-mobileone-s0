@@ -1,4 +1,4 @@
-"""CLI ngắn gọn cho project MobileNetV3Small phân loại cam GOOD/BAD."""
+"""CLI cho project MobileOne-S0 (PyTorch) phân loại cam GOOD/BAD."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import pandas as pd
 import yaml
 
 from orange.data import (
-    build_tf_dataset,
+    build_loader,
     calculate_class_weight,
     load_split_csvs,
     normalize_label,
@@ -32,13 +32,12 @@ from orange.evaluation import (
     save_training_plots,
 )
 from orange.model import (
-    build_mobilenetv3_small,
-    load_keras_model,
-    save_model_summary,
-    train_two_stage,
+    OrangeMobileOneS0,
+    load_checkpoint,
 )
+from orange.trainer import pick_device, train_two_stage
 
-LOGGER = logging.getLogger("orange_mobilenetv3")
+LOGGER = logging.getLogger("orange_mobileone_s0")
 
 
 def configure_logging() -> None:
@@ -91,11 +90,22 @@ def output_dir_from(config: dict[str, Any]) -> Path:
     return Path(config["project"].get("output_dir", "outputs")).expanduser().resolve()
 
 
-def prepare_data(config: dict[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Quét dataset gốc, chia train/validation/test và lưu CSV."""
+def splits_exist(config: dict[str, Any]) -> bool:
+    split_dir = output_dir_from(config) / "splits"
+    return all((split_dir / f"{n}.csv").exists() for n in ("train", "validation", "test"))
+
+
+def prepare_data(config: dict[str, Any], force: bool = False):
+    """Quét dataset gốc, chia train/validation/test và lưu CSV.
+
+    Nếu split đã có (vd. từ lần train MobileNet) thì KHÔNG chia lại, để so sánh công bằng.
+    """
     data_config = config["data"]
     output_dir = output_dir_from(config)
     output_dir.mkdir(parents=True, exist_ok=True)
+    if splits_exist(config) and not force:
+        LOGGER.info("Đã có split trong %s — giữ nguyên (dùng --force để chia lại).", output_dir / "splits")
+        return get_or_create_splits(config)
 
     manifest, invalid = scan_labeled_folder(
         root=data_config["source_dir"],
@@ -135,25 +145,25 @@ def prepare_data(config: dict[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame, pd
     return train_df, validation_df, test_df
 
 
-def build_datasets(
+def build_loaders(
     config: dict[str, Any],
     train_df: pd.DataFrame,
     validation_df: pd.DataFrame,
     test_df: pd.DataFrame,
 ):
-    """Tạo ba tf.data pipeline."""
+    """Tạo ba DataLoader (train có augmentation, validation/test không)."""
     data_config = config["data"]
     training_config = config["training"]
     common = {
         "image_size": int(data_config["image_size"]),
         "batch_size": int(training_config["batch_size"]),
         "seed": int(config["project"]["seed"]),
-        "cache_dataset": bool(training_config.get("cache_dataset", False)),
+        "num_workers": int(training_config.get("num_workers", 0)),
     }
     return (
-        build_tf_dataset(train_df, training=True, **common),
-        build_tf_dataset(validation_df, training=False, **common),
-        build_tf_dataset(test_df, training=False, **common),
+        build_loader(train_df, training=True, **common),
+        build_loader(validation_df, training=False, **common),
+        build_loader(test_df, training=False, **common),
     )
 
 
@@ -163,37 +173,34 @@ def get_or_create_splits(config: dict[str, Any]):
 
 
 def train_and_evaluate(config: dict[str, Any]) -> list[dict[str, Any]]:
-    """Train MobileNetV3Small và tạo báo cáo internal test."""
+    """Train MobileOne-S0 (2 giai đoạn, BN frozen) và tạo báo cáo internal test."""
     output_dir = output_dir_from(config)
     train_df, validation_df, test_df = get_or_create_splits(config)
-    train_ds, validation_ds, test_ds = build_datasets(
-        config, train_df, validation_df, test_df
-    )
+    train_ld, validation_ld, test_ld = build_loaders(config, train_df, validation_df, test_df)
+    device = pick_device(str(config["training"].get("device", "auto")))
+    LOGGER.info("Device: %s", device)
 
     class_weight = calculate_class_weight(train_df)
     LOGGER.info("Class weight: GOOD=%.4f, BAD=%.4f", class_weight[0], class_weight[1])
 
-    model, backbone = build_mobilenetv3_small(
-        image_size=int(config["data"]["image_size"]),
-        dropout=float(config["training"]["dropout"]),
-    )
-    save_model_summary(model, output_dir / "model_summary.txt")
+    model = OrangeMobileOneS0(pretrained=True, dropout=float(config["training"]["dropout"]))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "model_summary.txt").write_text(str(model), encoding="utf-8")
 
-    best_model_path, _, history = train_two_stage(
+    best_model_path, history = train_two_stage(
         model=model,
-        backbone=backbone,
-        train_dataset=train_ds,
-        validation_dataset=validation_ds,
+        train_loader=train_ld,
+        validation_loader=validation_ld,
         class_weight=class_weight,
         training_config=config["training"],
         output_dir=output_dir,
+        device=device,
+        extra_meta={"seed": int(config["project"]["seed"])},
     )
     save_training_plots(history, output_dir)
 
-    best_model = load_keras_model(best_model_path)
-    validation_probabilities, validation_latency = predict_frame(
-        best_model, validation_ds, validation_df
-    )
+    best_model = load_checkpoint(best_model_path, dropout=float(config["training"]["dropout"])).to(device)
+    validation_probabilities, validation_latency = predict_frame(best_model, validation_ld, validation_df, device)
     threshold, threshold_analysis = choose_threshold(
         validation_df["label"].astype(int).to_numpy(),
         validation_probabilities,
@@ -212,7 +219,7 @@ def train_and_evaluate(config: dict[str, Any]) -> list[dict[str, Any]]:
     )
     LOGGER.info("Threshold chọn trên validation: %.4f", threshold)
 
-    test_probabilities, test_latency = predict_frame(best_model, test_ds, test_df)
+    test_probabilities, test_latency = predict_frame(best_model, test_ld, test_df, device)
     internal_metrics = save_dataset_report(
         dataset_name="internal_test",
         frame=test_df,
@@ -222,12 +229,11 @@ def train_and_evaluate(config: dict[str, Any]) -> list[dict[str, Any]]:
         output_dir=output_dir,
     )
 
-    model_size_mb = best_model_path.stat().st_size / (1024 * 1024)
     summary_path = append_summary(
         [internal_metrics],
         output_dir,
-        parameter_count=int(best_model.count_params()),
-        model_size_mb=float(model_size_mb),
+        parameter_count=int(sum(p.numel() for p in best_model.parameters())),
+        model_size_mb=float(best_model_path.stat().st_size / (1024 * 1024)),
     )
     LOGGER.info("Bảng kết quả: %s", summary_path)
     return [internal_metrics]
@@ -251,11 +257,12 @@ def evaluate_external_datasets(config: dict[str, Any]) -> list[dict[str, Any]]:
         return []
 
     output_dir = output_dir_from(config)
-    model_path = output_dir / "models" / "best_model.keras"
+    model_path = output_dir / "models" / "best_model.pt"
     if not model_path.exists():
         raise FileNotFoundError(f"Không tìm thấy model đã train: {model_path}")
 
-    model = load_keras_model(model_path)
+    device = pick_device(str(config["training"].get("device", "auto")))
+    model = load_checkpoint(model_path, dropout=float(config["training"]["dropout"])).to(device)
     threshold = read_threshold(output_dir)
     results: list[dict[str, Any]] = []
 
@@ -284,15 +291,15 @@ def evaluate_external_datasets(config: dict[str, Any]) -> list[dict[str, Any]]:
                 invalid_dir / "invalid_images.csv", index=False, encoding="utf-8-sig"
             )
 
-        dataset = build_tf_dataset(
+        dataset = build_loader(
             frame,
             image_size=int(config["data"]["image_size"]),
             batch_size=int(config["training"]["batch_size"]),
             training=False,
             seed=int(config["project"]["seed"]),
-            cache_dataset=False,
+            num_workers=int(config["training"].get("num_workers", 0)),
         )
-        probabilities, latency = predict_frame(model, dataset, frame)
+        probabilities, latency = predict_frame(model, dataset, frame, device)
         metrics = save_dataset_report(
             dataset_name=str(item["name"]),
             frame=frame,
@@ -312,7 +319,7 @@ def evaluate_external_datasets(config: dict[str, Any]) -> list[dict[str, Any]]:
     summary_path = append_summary(
         all_results,
         output_dir,
-        parameter_count=int(model.count_params()),
+        parameter_count=int(sum(p.numel() for p in model.parameters())),
         model_size_mb=float(model_path.stat().st_size / (1024 * 1024)),
     )
     LOGGER.info("Đã cập nhật bảng tổng hợp: %s", summary_path)
@@ -322,7 +329,7 @@ def evaluate_external_datasets(config: dict[str, Any]) -> list[dict[str, Any]]:
 def predict_one(config: dict[str, Any], image_path: Path) -> None:
     """Dự đoán một ảnh khi cần kiểm tra nhanh."""
     output_dir = output_dir_from(config)
-    model_path = output_dir / "models" / "best_model.keras"
+    model_path = output_dir / "models" / "best_model.pt"
     if not image_path.exists():
         raise FileNotFoundError(f"Không tìm thấy ảnh: {image_path}")
     if not model_path.exists():
@@ -339,16 +346,16 @@ def predict_one(config: dict[str, Any], image_path: Path) -> None:
             }
         ]
     )
-    dataset = build_tf_dataset(
+    dataset = build_loader(
         frame,
         image_size=int(config["data"]["image_size"]),
         batch_size=1,
         training=False,
         seed=int(config["project"]["seed"]),
-        cache_dataset=False,
     )
-    model = load_keras_model(model_path)
-    probabilities, latency = predict_frame(model, dataset, frame)
+    device = pick_device(str(config["training"].get("device", "auto")))
+    model = load_checkpoint(model_path, dropout=float(config["training"]["dropout"])).to(device)
+    probabilities, latency = predict_frame(model, dataset, frame, device)
     probability_bad = float(probabilities[0])
     threshold = read_threshold(output_dir)
     predicted = "BAD" if probability_bad >= threshold else "GOOD"
@@ -362,12 +369,13 @@ def predict_one(config: dict[str, Any], image_path: Path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="MobileNetV3Small phân loại cam GOOD/BAD."
+        description="MobileOne-S0 (PyTorch) phân loại cam GOOD/BAD."
     )
     parser.add_argument("--config", default="config.yaml", help="Đường dẫn config.yaml")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("prepare", help="Quét và chia dataset gốc.")
+    prepare_parser = subparsers.add_parser("prepare", help="Quét và chia dataset gốc (giữ split cũ nếu đã có).")
+    prepare_parser.add_argument("--force", action="store_true", help="Chia lại dù đã có split.")
     subparsers.add_parser("train", help="Train và đánh giá internal test.")
     subparsers.add_parser(
         "evaluate-all", help="Đánh giá tất cả external dataset trong config."
@@ -389,13 +397,13 @@ def main() -> int:
         set_global_seed(int(config["project"]["seed"]))
 
         if args.command == "prepare":
-            prepare_data(config)
+            prepare_data(config, force=bool(args.force))
         elif args.command == "train":
             train_and_evaluate(config)
         elif args.command == "evaluate-all":
             evaluate_external_datasets(config)
         elif args.command == "run":
-            prepare_data(config)
+            prepare_data(config)  # giữ split cũ nếu có
             train_and_evaluate(config)
             evaluate_external_datasets(config)
         elif args.command == "predict":

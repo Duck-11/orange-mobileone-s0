@@ -1,279 +1,125 @@
-# Orange Quality Check — Runtime (GOOD/BAD, MobileNetV3-Small)
+# Orange Quality Check — GOOD/BAD với MobileOne-S0
 
-Bản chạy thực tế gọn nhẹ, chỉ **một file `app.py`**, dựng từ project training
-gốc (`main.py`, `orange/model.py`, `orange/data.py`, `orange/evaluation.py`,
-`config.yaml`). Mục tiêu: chạy trên máy tính để test, rồi copy nguyên cụm
-sang thẻ SD Raspberry Pi.
+Phân loại chất lượng cam (GOOD/BAD) bằng **MobileOne-S0** (PyTorch/`timm`, export ONNX FP32).
+`app.py` chạy camera/ảnh/video: OpenCV tách từng quả cam, MobileOne-S0 phân loại từng quả.
 
-## 0. Vì sao cần thêm bước detection bằng OpenCV?
+> **Lưu ý về bản cũ:** project trước đây dùng MobileNetV3-Small (Keras/TFLite). Các file đó
+> nằm trong `legacy/mobilenet_NOT_MOBILEONE/` và **không phải MobileOne-S0**. Kết quả của bản cũ
+> không được tính cho MobileOne-S0.
 
-Model `MobileNetV3-Small` hiện tại của bạn là **model phân loại ảnh**
-(1 ảnh → GOOD hoặc BAD), **không phải object detection model**, nên nó
-không thể tự vẽ nhiều bounding box cho nhiều quả cam trong một khung hình.
+## 1. Model
 
-`app.py` giải quyết việc này bằng một bước detection **rất nhẹ, dùng
-OpenCV** (ngưỡng màu HSV + contour) để tách từng quả cam thành từng vùng
-riêng, rồi mới crop từng vùng đưa vào MobileNetV3-Small:
-
-```
-Camera/ảnh/video → OpenCV: tách từng vùng quả cam (contour) → mỗi vùng 1 box
-                  → crop từng box → resize 224x224 → MobileNetV3-Small
-                  → GOOD/BAD + confidence → vẽ box + nhãn → hiển thị
-```
-
-**Giới hạn cần biết:** đây là detection dựa theo màu sắc/hình dạng, không
-phải AI detection, nên nếu nhiều quả cam **chạm/chồng sát nhau** thì có thể
-bị dính vào một contour duy nhất. Đây là đánh đổi để giữ hệ thống đủ nhẹ
-cho Raspberry Pi (không dùng YOLO). Nếu detect thiếu/dư quả trong điều kiện
-ánh sáng/nền của bạn, chỉnh 3 hằng số ở đầu `app.py`:
-
-```python
-HSV_LOWER, HSV_UPPER          # khoảng màu vỏ cam (vàng cam → nâu sẫm)
-MIN_CONTOUR_AREA_RATIO        # diện tích tối thiểu tính theo % khung hình
-```
-
-## 1. Model và preprocessing — giữ nguyên 100% so với project gốc
-
-Đã kiểm tra kỹ `orange/model.py` và `orange/data.py` trước khi viết `app.py`:
-
-| Thuộc tính | Giá trị (giữ nguyên) |
+| Mục | Giá trị |
 |---|---|
-| Kiến trúc | MobileNetV3-Small (`include_top=False`) + GlobalAveragePooling + Dropout + Dense(1, sigmoid) |
-| Input size | 224×224 |
-| Preprocessing | **Không tự chia 255 / không tự chuẩn hoá thủ công.** Model được build với `include_preprocessing=True`, nghĩa là việc chuẩn hoá pixel (0–255 → khoảng chuẩn của MobileNetV3) đã nằm sẵn trong model. `app.py` chỉ resize 224×224, đổi BGR→RGB (vì OpenCV đọc ảnh là BGR còn lúc train ảnh được đọc theo RGB) và ép kiểu `float32`, giống hệt `orange/data.py` gốc. |
-| Nhãn | `0 = GOOD`, `1 = BAD` — output model là **xác suất BAD** |
-| Threshold | Không cố định cứng trong code, mà đọc từ `threshold.json` — chính là `final_threshold` được `main.py train` chọn trên tập validation (mặc định dò trong khoảng 0.10–0.90, bước 0.01, theo `config.yaml` gốc) |
+| Kiến trúc | MobileOne-S0 (backbone `timm.create_model('mobileone_s0.apple_in1k', num_classes=0)`) + Dropout(0.2) + Linear(1024→1) |
+| Weights khởi tạo | ImageNet, nguồn `https://huggingface.co/timm/mobileone_s0.apple_in1k` |
+| Bằng chứng nguồn | `training/orange/mobileone_source.json` (phiên bản `timm`, `pretrained_cfg`, `weights_sha256`, số tham số backbone 4,268,272) |
+| License | Xem LICENSE của `apple/ml-mobileone`, `timm` và model card trên Hugging Face (chưa đối chiếu trong README này) |
+| Nhãn | `GOOD = 0`, `BAD = 1`; model xuất `p_BAD` |
+| Input ONNX | RGB, NCHW, float32, giá trị 0–255. Mean/std (lấy từ `pretrained_cfg` của weights) nằm **trong** model |
+| Deploy | Đã reparameterize (gộp nhánh) rồi export ONNX FP32 (`convert_to_onnx.py`) |
+| Parity | train vs deploy (PyTorch FP32): 4.06e-08; ONNX vs PyTorch deploy: 9.80e-08 (dung sai đặt trước: 1e-4; đo trên tensor ngẫu nhiên) |
 
-Không có thay đổi nào về kiến trúc, input size, preprocessing, class mapping
-hay threshold logic.
+## 2. Cách `app.py` hoạt động
 
-## 2. ⚠️ Lưu ý quan trọng: project ZIP bạn gửi CHƯA có model đã train
+```
+Camera/ảnh/video → OpenCV (ngưỡng HSV + contour) → mỗi vùng 1 box
+  → crop → resize 224×224 (INTER_AREA), BGR→RGB → MobileOne-S0 (ONNX)
+  → p_BAD >= threshold ? BAD : GOOD → vẽ box + nhãn + % tin cậy
+```
+Bước tách quả là **phát hiện bằng màu/hình dạng, không phải AI detector** (không dùng YOLO).
+Các quả cam chạm/chồng nhau có thể bị gộp thành một khung. Chỉnh `HSV_LOWER`, `HSV_UPPER`,
+`MIN_CONTOUR_AREA_RATIO` ở đầu `app.py` nếu phát hiện thiếu/thừa.
 
-Đã kiểm tra toàn bộ ZIP: chỉ có **source code** (`main.py`, `orange/`,
-`config.yaml`...), thư mục `outputs/` rỗng — **chưa có file
-`best_model.keras` hay trọng số nào**. Vì vậy `app.py` chưa thể chạy ngay
-cho tới khi bạn:
+## 3. Dữ liệu và huấn luyện (chạy riêng, không phải baseline chung của nhóm)
 
-1. Train model (bước 3 dưới đây), hoặc
-2. Đã có sẵn `best_model.keras` từ máy khác — chỉ cần copy file đó vào
-   đúng vị trí `training/outputs/models/best_model.keras` rồi làm tiếp bước 4.
+- 5 lớp gốc: `fresh_orange` → GOOD; `blackspotted_orange`, `cankered_orange`, `rotten_orange`, `green_orange` → BAD.
+- Chia ngẫu nhiên phân tầng 70/15/15, seed 42 (giữ nguyên split của lần chạy MobileNet cũ). **Không phải** manifest chung đã ký `7851/2059`; `green_orange` ở đây là BAD.
+- Huấn luyện 2 giai đoạn: head (backbone đóng băng, tối đa 12 epoch, lr 1e-3) rồi fine-tune 2 stage cuối (tối đa 18 epoch, lr 1e-5). BatchNorm đóng băng cả hai giai đoạn. Adam, loss BCE có class weight, early stopping 5, giảm lr khi val_loss không cải thiện.
+- Checkpoint tốt nhất theo `val_loss` toàn cục trên cả hai giai đoạn (`training/outputs/models/best_model.pt`).
+- Threshold: chọn trên validation theo F1 BAD. Validation hoàn hảo trên toàn dải 0.10–0.90 nên chọn điểm giữa vùng hòa điểm = **0.50**.
 
-## 3. Cấu trúc project
+## 4. Kết quả đã đo
+
+| Tập | Ảnh | Threshold | Accuracy | Precision BAD | Recall BAD | F1 BAD | ROC-AUC |
+|---|---|---|---|---|---|---|---|
+| internal_test (split ngẫu nhiên) | — | 0.10 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+| dataset ngoài `dataset_3` (fresh/rotten) | 4261 | 0.50 | 0.9162 | 0.9125 | 0.9254 | 0.9189 | 0.9722 |
+| test_moi | 99 | 0.50 | 0.9596 | 0.9559 | 0.9848 | 0.9701 | — |
+
+Dataset ngoài ở 0.50: 194 ảnh `fresh` bị đoán BAD, 163 ảnh `rotten` bị đoán GOOD (cùng tập ở 0.10: 254 và 123;
+ROC-AUC không đổi theo threshold). Internal test được đo khi threshold còn là 0.10 và chưa đo lại ở 0.50.
+
+`test_moi` (99 ảnh): 4 ảnh sai ở 0.50.
+- Ba ảnh `fresh_orange` (`f (22)`, `f (23)`, `f (24)`) bị đoán BAD với p_BAD = 1.000. Khi mở ảnh, cả ba là **cam vỏ xanh**
+  (green peel) nhưng đang nằm trong thư mục `fresh_orange`. Chính sách huấn luyện coi `green_orange` là BAD, nên model đoán
+  nhất quán với chính sách; nhãn trong `test_moi` mâu thuẫn với chính sách đó. Nếu gán lại ba ảnh này sang BAD thì chỉ còn 1 ảnh sai
+  (98/99 = 0.9899); con số này chỉ mang tính tham khảo vì nhãn được sửa sau khi đã xem lỗi. Kết quả chính thức giữ nguyên nhãn gốc.
+- Một ảnh `green_orange` (`g (17)`): ảnh tối, cam xanh có nhiều đốm nâu, bị đoán GOOD với p_BAD = 0.334. Đây là lỗi thật của model.
+- Một số ảnh trong `test_moi` có góc đen do xoay, dấu hiệu là ảnh đã augment.
+
+Ghi chú khi đọc kết quả:
+- Internal test hoàn hảo nhưng dataset ngoài chỉ đạt ~92%: internal test dễ hơn thực tế
+  (split ngẫu nhiên có thể có ảnh gần giống nhau ở cả train và test — chưa kiểm tra). Dùng số của dataset ngoài và `test_moi` làm tham chiếu thực tế hơn.
+- ROC-AUC của dataset ngoài (0.972) không đổi khi đổi threshold, nên phần lỗi còn lại chủ yếu do khác biệt giữa nguồn ảnh, không chỉnh được bằng threshold.
+- Dataset ngoài chỉ kiểm tra `fresh` với `rotten`, không kiểm tra `blackspot`, `canker`, `green`. Chưa kiểm tra có ảnh trùng với tập train hay không.
+- `test_moi`: mẫu nhỏ (99 ảnh), chưa đủ để kết luận chắc chắn.
+- Chưa so sánh với MobileNetV3-Small cũ trên cùng dữ liệu.
+
+## 5. Cấu trúc
 
 ```
 orange_project/
-├── app.py                  ← FILE CHẠY THỰC TẾ DUY NHẤT (camera/ảnh/video)
-├── convert_to_tflite.py    ← chạy 1 lần sau khi train, để export model.tflite
-├── requirements.txt        ← thư viện tối giản để CHẠY app.py
-├── README.md                ← chính là file này
-├── model.tflite              ← (sẽ được tạo ra ở bước 4) model dùng khi chạy
-├── threshold.json             ← (sẽ được tạo ra ở bước 4) threshold đã chọn
-└── training/                 ← giữ nguyên pipeline train/evaluate gốc, KHÔNG
-    ├── main.py                 cần thiết khi chạy thực tế, chỉ dùng khi
-    ├── config.yaml             muốn train lại / train model mới
-    ├── requirements.txt         (đầy đủ TensorFlow + pandas + sklearn...)
-    ├── README_TRAINING.md       (README gốc của project training)
-    └── orange/
-        ├── __init__.py
-        ├── data.py
-        ├── model.py
-        └── evaluation.py
+├── app.py                 chạy camera/ảnh/video (ONNX Runtime)
+├── model.onnx             model deploy (FP32, đã reparameterize)
+├── model_meta.json        model ID, dtype, hash, parity, norm_cfg
+├── threshold.json         threshold đang dùng
+├── requirements.txt       thư viện CHẠY app.py
+├── convert_to_onnx.py     best_model.pt → model.onnx (+ kiểm tra parity)
+├── eval_folder.py         đánh giá model.onnx trên thư mục ảnh
+├── tests/                 pytest (kiến trúc, parity, preprocessing, pipeline)
+├── tools/                 prove_source.py, ...
+├── legacy/                bản MobileNetV3-Small cũ — NOT_MOBILEONE
+└── training/              pipeline train PyTorch
+    ├── main.py, config.yaml, requirements.txt
+    └── orange/            data.py, model.py, trainer.py, evaluation.py, mobileone_source.json
 ```
 
-Khi chạy thực tế trên Raspberry Pi, bạn **chỉ cần copy 4 thứ**:
-`app.py`, `requirements.txt`, `model.tflite`, `threshold.json`
-(không cần thư mục `training/`).
+## 6. Cài đặt và chạy
 
-## 4. Cài đặt & train trên Windows
-
-### 4.1. Cài môi trường training (để tạo model)
-
+Chạy ứng dụng (Windows):
 ```cmd
-cd training
-py -3.11 -m venv .venv
-.venv\Scripts\activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-Sửa `data.source_dir` trong `training/config.yaml` trỏ tới dataset của bạn,
-rồi train:
-
-```cmd
-python main.py run
-```
-
-Lệnh này prepare data → train → chọn threshold trên validation → đánh giá
-test/external, giống hệt project gốc. Kết quả quan trọng để dùng cho
-runtime:
-
-```
-training/outputs/models/best_model.keras
-training/outputs/selected_threshold.json
-```
-
-### 4.2. Export sang model.tflite (khuyến nghị cho Raspberry Pi)
-
-Vẫn trong virtualenv `training` (đã có TensorFlow), quay về thư mục gốc
-project rồi chạy:
-
-```cmd
-cd ..
-python convert_to_tflite.py
-```
-
-Script này:
-
-* Convert `training/outputs/models/best_model.keras` → `model.tflite`
-  (mặc định **float32, không lượng tử hoá**, để kết quả gần như giống hệt
-  bản `.keras`). Nếu muốn model nhẹ/nhanh hơn nữa và chấp nhận lệch nhẹ kết
-  quả, thêm `--quantize`.
-* Copy threshold đã chọn (`training/outputs/selected_threshold.json`)
-  sang `threshold.json` cạnh `app.py`.
-
-Sau bước này, thư mục gốc sẽ có `model.tflite` + `threshold.json`, sẵn sàng
-chạy `app.py`.
-
-> Nếu vì lý do nào đó bạn không muốn convert sang `.tflite`, có thể copy
-> thẳng `training/outputs/models/best_model.keras` thành `model.keras`
-> cạnh `app.py` — `app.py` tự nhận và dùng TensorFlow đầy đủ để chạy.
-> Cách này chạy được trên Windows nhưng **không khuyến nghị cho Raspberry
-> Pi** vì TensorFlow đầy đủ rất nặng và chậm trên Pi.
-
-### 4.3. Cài môi trường để CHẠY `app.py` trên Windows
-
-```cmd
-cd orange_project
 py -3.11 -m venv .venv-app
 .venv-app\Scripts\activate
-python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-```
-
-## 5. Chạy webcam
-
-```cmd
-python app.py --camera
-```
-
-hoặc không cần truyền gì (mặc định webcam):
-
-```cmd
-python app.py
-```
-
-* Mỗi quả cam trong khung hình có **bounding box riêng** kèm nhãn
-  `GOOD`/`BAD` + phần trăm confidence.
-* Có hiển thị FPS và số quả cam đang phát hiện ở góc trên bên trái.
-* Nhấn phím `q` để thoát.
-* Nếu máy có nhiều webcam: `python app.py --camera --camera-id 1`.
-
-## 6. Test ảnh
-
-```cmd
-python app.py --image test.jpg
-```
-
-Thêm `--save` nếu muốn lưu ảnh đã vẽ kết quả (lưu cạnh ảnh gốc, tên
-`test_result.jpg`):
-
-```cmd
+python app.py --camera                # webcam; --camera-id 1 nếu có nhiều camera
 python app.py --image test.jpg --save
-```
-
-## 7. Test video
-
-```cmd
 python app.py --video test.mp4
+python app.py --camera --threshold 0.5
 ```
+Nhấn `q` để thoát.
 
-Xử lý từng frame giống webcam: detect từng quả, classify, vẽ bounding box,
-hiển thị liên tục. Nhấn `q` để thoát giữa chừng.
-
-## 8. Chuyển sang Raspberry Pi
-
-1. Copy 4 file/thư mục sau vào thẻ SD (hoặc qua `scp`):
-   ```
-   app.py
-   requirements.txt
-   model.tflite
-   threshold.json
-   ```
-2. Trên Raspberry Pi (Raspberry Pi OS, Python 3.9+), cài thư viện — **không
-   cài TensorFlow đầy đủ**, chỉ cần:
-
-   ```bash
-   sudo apt update
-   sudo apt install -y python3-pip python3-opencv libatlas-base-dev
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install --upgrade pip
-   pip install opencv-python-headless numpy
-   pip install tflite-runtime
-   ```
-
-   > `tflite-runtime` là gói chính thức của Google cho thiết bị nhúng, nhẹ
-   > hơn TensorFlow đầy đủ rất nhiều — phù hợp Raspberry Pi. `app.py` tự
-   > phát hiện và ưu tiên dùng `tflite_runtime` nếu có; nếu Pi của bạn
-   > không cài được `tflite-runtime` (một số phiên bản Raspberry Pi OS /
-   > Python không có wheel sẵn), có thể cài `tensorflow` đầy đủ như phương
-   > án dự phòng — chạy được nhưng chậm hơn.
-
-3. Chạy với USB camera hoặc Raspberry Pi Camera (được OpenCV nhận diện như
-   webcam thông thường):
-
-   ```bash
-   python3 app.py --camera
-   ```
-
-   Nếu chạy qua SSH không có màn hình, `cv2.imshow` sẽ báo lỗi vì không có
-   giao diện đồ hoạ — cần chạy trực tiếp trên desktop của Pi (có màn hình
-   HDMI) hoặc dùng VNC.
-
-4. Test ảnh/video trên Pi giống hệt Windows:
-
-   ```bash
-   python3 app.py --image test.jpg
-   python3 app.py --video test.mp4
-   ```
-
-Không cần Internet khi chạy inference — `model.tflite` chạy hoàn toàn
-offline trên máy.
-
-## 9. Danh sách thư viện cần cài trên Raspberry Pi
-
+Train lại (cần `torch`, nên dùng bản có CUDA nếu có GPU NVIDIA):
+```cmd
+cd training
+python -m pip install -r requirements.txt
+python main.py run          # giữ split cũ nếu outputs\splits đã có
+cd ..
+python convert_to_onnx.py --checkpoint training\outputs\models\best_model.pt
+python eval_folder.py --root "D:\NCKH\test_moi"
 ```
-opencv-python-headless
-numpy
-tflite-runtime
-```
+Trước khi train, sửa `data.source_dir` (và `external_datasets.path`) trong `training/config.yaml`.
 
-(hoặc `tensorflow` đầy đủ thay cho `tflite-runtime` nếu không cài được, xem
-lưu ý ở mục 8.)
+Kiểm thử: `pytest tests -v`.
 
-## 10. Tổng hợp các lệnh chính
+## 7. Raspberry Pi
 
-| Việc cần làm | Lệnh |
-|---|---|
-| Train model | `cd training && python main.py run` |
-| Export tflite + threshold | `python convert_to_tflite.py` |
-| Chạy webcam | `python app.py` hoặc `python app.py --camera` |
-| Test ảnh | `python app.py --image test.jpg` |
-| Test ảnh và lưu kết quả | `python app.py --image test.jpg --save` |
-| Test video | `python app.py --video test.mp4` |
-| Đổi webcam khác | `python app.py --camera --camera-id 1` |
-| Ghi đè threshold thủ công | `python app.py --threshold 0.4` |
-| Thoát chương trình | phím `q` |
+Cần copy: `app.py`, `requirements.txt`, `model.onnx`, `model_meta.json`, `threshold.json`.
+`requirements.txt` dùng `onnxruntime`. **Chưa kiểm chứng trên Raspberry Pi** (cài đặt `onnxruntime` và tốc độ trên Pi cần thử riêng).
+Chạy qua SSH không có màn hình sẽ lỗi `cv2.imshow`; cần chạy trên desktop của Pi hoặc dùng VNC.
 
-## 11. Đã kiểm tra trước khi bàn giao
+## 8. Giới hạn đã biết
 
-* `app.py`, `convert_to_tflite.py` và toàn bộ code trong `training/` đã
-  compile không lỗi cú pháp/import.
-* Đã smoke-test toàn bộ pipeline `app.py` (detection OpenCV → crop → tiền
-  xử lý → inference → vẽ bounding box) bằng model MobileNetV3-Small dựng
-  đúng kiến trúc gốc, xác nhận: mỗi quả cam trong ảnh có bounding box
-  riêng biệt, không bị gộp; cả hai backend `model.tflite` và `model.keras`
-  đều load và infer đúng, không lỗi input size/đường dẫn.
-* Vì ZIP gốc không kèm trọng số đã train, **chưa thể kiểm chứng độ chính
-  xác thực tế của model** — điều này phụ thuộc vào bước train ở mục 4.1
-  bạn tự chạy với dataset của bạn.
+- Phát hiện quả bằng màu/hình dạng, phụ thuộc ánh sáng và nền.
+- Không dùng manifest chung; kết quả chỉ là của lần train riêng này.
+- Chưa có reparameterize parity trên ảnh thật (hiện đo trên tensor ngẫu nhiên) và chưa có kiểm thử tiền xử lý train/app trên cùng ảnh.

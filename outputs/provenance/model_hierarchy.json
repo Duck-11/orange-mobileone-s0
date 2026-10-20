@@ -1,0 +1,116 @@
+{
+  "timm_name": "mobileone_s0.apple_in1k",
+  "backbone_class": "ByobNet",
+  "backbone_mro": [
+    "ByobNet",
+    "Module",
+    "object"
+  ],
+  "wrapper_class": "OrangeMobileOneS0",
+  "num_features": 1024,
+  "backbone_params": 4268272,
+  "total_params_with_head": 4269297,
+  "mobileone_block_count": 43,
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "modules": [
+    {
+      "module": "stem",
+      "class": "MobileOneBlock",
+      "params": 1632,
+      "output_shape": [
+        1,
+        48,
+        112,
+        112
+      ]
+    },
+    {
+      "module": "stages",
+      "class": "Sequential",
+      "params": 4266640,
+      "output_shape": [
+        1,
+        1024,
+        7,
+        7
+      ]
+    },
+    {
+      "module": "final_conv",
+      "class": "Identity",
+      "params": 0,
+      "output_shape": [
+        1,
+        1024,
+        7,
+        7
+      ]
+    },
+    {
+      "module": "head",
+      "class": "ClassifierHead",
+      "params": 0,
+      "output_shape": [
+        1,
+        1024
+      ]
+    },
+    {
+      "module": "stages.0",
+      "class": "Sequential",
+      "params": 24000,
+      "output_shape": [
+        1,
+        48,
+        56,
+        56
+      ],
+      "mobileone_blocks": 4,
+      "conv_kxk_branches_first_block": 4
+    },
+    {
+      "module": "stages.1",
+      "class": "Sequential",
+      "params": 539472,
+      "output_shape": [
+        1,
+        128,
+        28,
+        28
+      ],
+      "mobileone_blocks": 16,
+      "conv_kxk_branches_first_block": 4
+    },
+    {
+      "module": "stages.2",
+      "class": "Sequential",
+      "params": 2634368,
+      "output_shape": [
+        1,
+        256,
+        14,
+        14
+      ],
+      "mobileone_blocks": 20,
+      "conv_kxk_branches_first_block": 4
+    },
+    {
+      "module": "stages.3",
+      "class": "Sequential",
+      "params": 1068800,
+      "output_shape": [
+        1,
+        1024,
+        7,
+        7
+      ],
+      "mobileone_blocks": 2,
+      "conv_kxk_branches_first_block": 4
+    }
+  ]
+}

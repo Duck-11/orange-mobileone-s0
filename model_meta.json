@@ -1,0 +1,33 @@
+{
+  "model_id": "MobileOne-S0",
+  "timm_name": "mobileone_s0.apple_in1k",
+  "dtype": "float32",
+  "input": "RGB NCHW float32 0..255 (mean/std nằm trong graph)",
+  "norm_cfg": {
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "input_size": [
+      3,
+      224,
+      224
+    ]
+  },
+  "labels": {
+    "GOOD": 0,
+    "BAD": 1
+  },
+  "checkpoint_train": "training\\outputs\\models\\best_model.pt",
+  "checkpoint_train_sha256": "093be0cd269d0d2db50b0b12e85e0916e68dc8053c5187bde674c485f35d1f88",
+  "onnx_sha256": "2302fc1e8fcb674c5f53a9ddc61ac5e0f2c02e74f070c6aaf60fe5147d9df9c0",
+  "parity_train_vs_deploy": 4.062894731760025e-08,
+  "parity_onnx_vs_deploy": 9.802170097827911e-08,
+  "parity_tol": 0.0001
+}
